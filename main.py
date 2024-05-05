@@ -13,11 +13,30 @@ class Model(BaseModel):
     Accuracy: float
     Confusion_Matrix: List[List[int]]
 
-@app.get("/")
-def root():
-    return {"Test":"One"}
+result_router = APIRouter()
+prediction_router = APIRouter()
 
-@app.post("/predict-stroke/", response_model=Model)
+@result_router.get("/results/", response_model=Model)
+async def get_results():
+    try:
+        # Directly load JSON from file
+        with open('model_results.json', 'r') as f:
+            response = json.load(f)
+            
+        model_results = Model(
+            Accuracy=response['Accuracy'],
+            Confusion_Matrix=response['Confusion_Matrix']
+        )
+        return model_results
+    except FileNotFoundError:
+        raise HTTPException(status_code=404, detail="File not found")
+    except json.JSONDecodeError:
+        raise HTTPException(status_code=400, detail="Error decoding JSON")
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+    
+
+@prediction_router.post("/predict-stroke/", response_model=Model)
 async def predict_stroke_api(file: UploadFile = File(...)):
     if file.content_type != 'text/csv':
         raise HTTPException(status_code=400, detail='invalid file type.')
@@ -39,4 +58,10 @@ async def predict_stroke_api(file: UploadFile = File(...)):
     return results 
 
 
+app.include_router(result_router)
+app.include_router(prediction_router)
+
+@app.get("/")
+def root():
+    return {"message": "API - root. navigate to routers.."}
 
